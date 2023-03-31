@@ -6,3 +6,4 @@ wincng_aeskey_ctx_t wincng_aeskey_ctx_new(const unsigned char *key, size_t key_s
 
 int wincng_ran_byte();
 
+void wincng_aeskey_ctx_free(wincng_aeskey_ctx_t ctx);

@@ -34,7 +34,7 @@ int main(int argc, const char *argv[])
 		48, 198,  97, 198, 198,   0, 100,  86
 	};
 
-	wincng_aeskey_ctx_t aeskey_ctx = NULL;
+	wincng_aeskey_ctx_t aeskey_encrypt_ctx = NULL;
 
 	int i;
 
@@ -43,19 +43,21 @@ int main(int argc, const char *argv[])
 		printf("ran = % d\n", shared_aeskey_iv_arrary[i]);
 	}
 
-	aeskey_ctx = wincng_aeskey_ctx_new(
+	aeskey_encrypt_ctx = wincng_aeskey_ctx_new(
 		&shared_aeskey_secret_array[0],
 		sizeof(shared_aeskey_secret_array),
 		&shared_aeskey_iv_arrary[0],
 		sizeof(shared_aeskey_iv_arrary)
 	);
-	assert(aeskey_ctx);
+	assert(aeskey_encrypt_ctx);
 
 	//retv = wincng_aeskey_ctx_new(&aeskey_byte_array[0], sizeof(aeskey_byte_array), &aeskey_ctx);
 
 	//retv = wincng_crypt_aes_encrypt(&aeskey_ctx, plaintext, sizeof(plaintext), &ciphertext_p, &ciphertext_size);
 
 	assert(retv == 0);
+
+	wincng_aeskey_ctx_free(aeskey_encrypt_ctx);
 
 	return 0;
 }

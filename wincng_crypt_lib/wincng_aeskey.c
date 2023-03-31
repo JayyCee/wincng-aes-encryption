@@ -3,6 +3,7 @@
 #include <windows.h>
 #include <assert.h>
 #include <ntstatus.h>
+#include <assert.h>
 
 
 #include "wincng_crypt.h"
@@ -29,7 +30,13 @@ wincng_aeskey_ctx_t wincng_aeskey_ctx_new(const unsigned char *shared_secret_key
 	// fill in struct data
 	ctx->shared_secret_key = shared_secret_key;
 	ctx->shared_secret_key_size = shared_secret_key_size;
-	ctx->pbIV = iv;
+	
+	// make a copy of IV
+	ctx->pbIV = malloc(iv_size);
+	assert(ctx->pbIV);
+
+	memcpy(ctx->pbIV, iv, iv_size);
+
 	ctx->cbIV = iv_size;
 
 	
@@ -120,4 +127,11 @@ int wincng_ran_byte()
 	assert(ns == STATUS_SUCCESS);
 
 	return buf[0];
+}
+
+
+void wincng_aeskey_ctx_free(wincng_aeskey_ctx_t ctx)
+{
+	ctx;
+
 }
