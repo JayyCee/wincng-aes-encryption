@@ -10,10 +10,6 @@
 
 #include "wincng_aeskey.h"
 
-static const unsigned char key_iv[] = {
-	131,  67, 200,  76, 149, 200,  28,  51,
-	246, 166,  84, 193,  22, 190, 161, 169
-};
 
 #define NT_SUCCESS(Status)          (((NTSTATUS)(Status)) >= 0)
 #define STATUS_UNSUCCESSFUL         ((NTSTATUS)0xC0000001L)
@@ -36,7 +32,6 @@ wincng_aeskey_ctx_t wincng_aeskey_ctx_new(const unsigned char *shared_secret_key
 	assert(ctx->pbIV);
 
 	memcpy(ctx->pbIV, iv, iv_size);
-
 	ctx->cbIV = iv_size;
 
 	
@@ -48,7 +43,6 @@ wincng_aeskey_ctx_t wincng_aeskey_ctx_new(const unsigned char *shared_secret_key
 		NULL, // NULL is for using default provider
 		0)))
 	{
-		ctx = NULL;
 		goto done_err;
 	}
 
@@ -74,13 +68,78 @@ wincng_aeskey_ctx_t wincng_aeskey_ctx_new(const unsigned char *shared_secret_key
 	}
 
 
+	// Calculate the block length for the IV.
+	if (!NT_SUCCESS(status = BCryptGetProperty(
+		ctx->hAesAlg,
+		BCRYPT_BLOCK_LENGTH,   //JC: this does not seem to have anything related to the IV?
+		(PBYTE)&ctx->cbIV,
+		sizeof(DWORD),
+		&cbData,
+		0)))
+	{
+		printf("**** Error 0x%x returned by BCryptGetProperty\n", status);
+		goto done_err;
+	}
 
-done_err:
+	// Determine whether the cbIV is not longer than the IV length.
+	if (ctx->cbIV > iv_size)
+	{
+		printf("**** block length is longer than the provided IV length\n");
+		goto done_err;
+	}
+
+	// Allocate a buffer for the IV. The buffer is consumed during the 
+// encrypt/decrypt process.
+	ctx->pbIV = (PBYTE)HeapAlloc(GetProcessHeap(), 0, ctx->cbIV);
+	if (NULL == ctx->pbIV)
+	{
+		printf("**** memory allocation failed\n");
+		goto done_err;
+	}
+
+	memcpy(ctx->pbIV, iv, ctx->cbIV);
+
+
 	if (ctx->hAesAlg)
 		BCryptCloseAlgorithmProvider(ctx->hAesAlg, 0);
 
 	if (ctx) {
-		free(ctx);
+		wincng_aeskey_ctx_free(ctx);
+		ctx = NULL;
+	}
+
+	// CNG API needs us to choose a mode: CBC mode is recommeded
+	if (!NT_SUCCESS(status = BCryptSetProperty(
+		ctx->hAesAlg,
+		BCRYPT_CHAINING_MODE,
+		(PBYTE)BCRYPT_CHAIN_MODE_CBC,
+		sizeof(BCRYPT_CHAIN_MODE_CBC),
+		0)))
+	{
+		printf("**** Error 0x%x returned by BCryptSetProperty\n", status);
+		goto done_err;
+	}
+
+	// Generate the keyObject from supplied input key bytes.
+	if (!NT_SUCCESS(status = BCryptGenerateSymmetricKey(
+		ctx->hAesAlg,
+		&ctx->hKey,
+		ctx->pbKeyObject,
+		ctx->cbKeyObject,
+		(PBYTE)shared_secret_key,
+		shared_secret_key_size,
+		0)))
+	{
+		printf("**** Error 0x%x returned by BCryptGenerateSymmetricKey\n", status);
+		goto done_err;
+	}
+
+	// All is good now
+	goto done;
+
+done_err:
+	if (ctx) {
+		wincng_aeskey_ctx_free(ctx);
 		ctx = NULL;
 	}
 
@@ -89,19 +148,6 @@ done:
 	return ctx;
 }
 
-int wincng_aeskey_ctx_set_keybyte(const unsigned char *key_byte_data, size_t key_byte_data_size, wincng_aeskey_ctx_t *wincng_aeskey_ctx_p)
-{
-	int retv_exit = 0;
-
-
-	key_byte_data;
-	key_byte_data_size;
-	wincng_aeskey_ctx_p;
-
-
-
-	return retv_exit;
-}
 
 int wincng_ran_byte()
 {
@@ -132,6 +178,15 @@ int wincng_ran_byte()
 
 void wincng_aeskey_ctx_free(wincng_aeskey_ctx_t ctx)
 {
-	ctx;
+	if (ctx == NULL)
+		return;
+
+	if (ctx->pbIV)
+		free(ctx->pbIV);
+	
+	BCryptCloseAlgorithmProvider(ctx->hAesAlg, 0);
+		
+
+	free(ctx);
 
 }

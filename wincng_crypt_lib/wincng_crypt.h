@@ -5,7 +5,7 @@
 typedef struct wincng_aeskey_ctx {
 	const unsigned char *shared_secret_key;
 	size_t shared_secret_key_size;
-	const unsigned char *pbIV;
+	unsigned char *pbIV;
 	size_t cbIV;
 
 	BCRYPT_ALG_HANDLE       hAesAlg;
