@@ -4,15 +4,21 @@
 #include <assert.h>
 #include <ntstatus.h>
 #include <assert.h>
-
+#include <stdio.h>
 
 #include "wincng_crypt.h"
 
 #include "wincng_aeskey.h"
 
+#define MY_LOG(...) do {int line = __LINE__;\
+	printf("%s:%d: ", __FILE__, line);\
+	printf(__VA_ARGS__); \
+} while (0)
 
 #define NT_SUCCESS(Status)          (((NTSTATUS)(Status)) >= 0)
 #define STATUS_UNSUCCESSFUL         ((NTSTATUS)0xC0000001L)
+
+static const char *wincng_get_ntstat_s_by_v(NTSTATUS v);
 
 
 wincng_aeskey_ctx_t wincng_aeskey_ctx_new(const unsigned char *shared_secret_key, size_t shared_secret_key_size, const unsigned char *iv, size_t iv_size)
@@ -47,20 +53,23 @@ wincng_aeskey_ctx_t wincng_aeskey_ctx_new(const unsigned char *shared_secret_key
 	}
 
 	// Calculate the size of the buffer to hold the KeyObject.
-	DWORD cbData = 0;
+	ULONG cbResult = 0;
 
 	if (!NT_SUCCESS(status = BCryptGetProperty(
 		ctx->hAesAlg,
 		BCRYPT_OBJECT_LENGTH,
-		(PBYTE)&ctx->cbKeyObject,
+		(PUCHAR)&(ctx->cbKeyObject),
 		sizeof(ctx->cbKeyObject),
-		&cbData,
+		&cbResult,
 		0)))
 	{
+		MY_LOG("** Error: BCryptGetProperty(): 0x%08X: %s\n", status, wincng_get_ntstat_s_by_v(status));
 		goto done_err;
 	}
 
-	// Allocate the key object on the heap.
+
+	// Allocate the keyObject on the heap.
+	// keyobject takes data when hKey is generated
 	ctx->pbKeyObject = (PBYTE)HeapAlloc(GetProcessHeap(), 0, ctx->cbKeyObject);
 	if (NULL == ctx->pbKeyObject)
 	{
@@ -74,7 +83,7 @@ wincng_aeskey_ctx_t wincng_aeskey_ctx_new(const unsigned char *shared_secret_key
 		BCRYPT_BLOCK_LENGTH,   //JC: this does not seem to have anything related to the IV?
 		(PBYTE)&ctx->cbIV,
 		sizeof(DWORD),
-		&cbData,
+		&cbResult,
 		0)))
 	{
 		printf("**** Error 0x%x returned by BCryptGetProperty\n", status);
@@ -100,14 +109,6 @@ wincng_aeskey_ctx_t wincng_aeskey_ctx_new(const unsigned char *shared_secret_key
 	memcpy(ctx->pbIV, iv, ctx->cbIV);
 
 
-	if (ctx->hAesAlg)
-		BCryptCloseAlgorithmProvider(ctx->hAesAlg, 0);
-
-	if (ctx) {
-		wincng_aeskey_ctx_free(ctx);
-		ctx = NULL;
-	}
-
 	// CNG API needs us to choose a mode: CBC mode is recommeded
 	if (!NT_SUCCESS(status = BCryptSetProperty(
 		ctx->hAesAlg,
@@ -120,14 +121,14 @@ wincng_aeskey_ctx_t wincng_aeskey_ctx_new(const unsigned char *shared_secret_key
 		goto done_err;
 	}
 
-	// Generate the keyObject from supplied input key bytes.
+	// Generate the hKey and keyObject from supplied input key bytes.
 	if (!NT_SUCCESS(status = BCryptGenerateSymmetricKey(
 		ctx->hAesAlg,
 		&ctx->hKey,
 		ctx->pbKeyObject,
 		ctx->cbKeyObject,
 		(PBYTE)shared_secret_key,
-		shared_secret_key_size,
+		(ULONG)shared_secret_key_size,
 		0)))
 	{
 		printf("**** Error 0x%x returned by BCryptGenerateSymmetricKey\n", status);
@@ -181,12 +182,48 @@ void wincng_aeskey_ctx_free(wincng_aeskey_ctx_t ctx)
 	if (ctx == NULL)
 		return;
 
-	if (ctx->pbIV)
+	if (ctx->pbIV) {
 		free(ctx->pbIV);
-	
-	BCryptCloseAlgorithmProvider(ctx->hAesAlg, 0);
-		
+		ctx->pbIV = NULL;
+	}
+
+	if (ctx->pbKeyObject) {
+		free(ctx->pbKeyObject);
+		ctx->pbKeyObject = NULL;
+	}
+
+	if (ctx->hKey) {
+		BCryptDestroyKey(ctx->hKey);
+	}
+
+	if (ctx->hAesAlg) {
+		BCryptCloseAlgorithmProvider(ctx->hAesAlg, 0);
+		ctx->hAesAlg = NULL;
+	}
 
 	free(ctx);
 
+}
+
+struct ntstat_v_s {
+	LONG v;
+	const char *s;
+};
+
+static struct  ntstat_v_s sg_ntstat_v_s[] = {
+	STATUS_BUFFER_TOO_SMALL, "STATUS_BUFFER_TOO_SMALL",
+};
+
+static const char *wincng_get_ntstat_s_by_v(NTSTATUS v)
+{
+	int i;
+
+	static const char unknown[] = "unknown";
+
+	for (i = 0; i < ARRAYSIZE(sg_ntstat_v_s); i++) {
+		if (sg_ntstat_v_s[i].v == v)
+			return sg_ntstat_v_s[i].s;
+	}
+
+	return unknown;
 }

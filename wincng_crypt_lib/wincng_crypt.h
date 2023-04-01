@@ -11,8 +11,8 @@ typedef struct wincng_aeskey_ctx {
 	BCRYPT_ALG_HANDLE       hAesAlg;
 
 
-	PBYTE pbKeyObject;
-	WORD  cbKeyObject;
+	PUCHAR pbKeyObject;
+	ULONG  cbKeyObject;
 
 	BCRYPT_KEY_HANDLE       hKey;
 
