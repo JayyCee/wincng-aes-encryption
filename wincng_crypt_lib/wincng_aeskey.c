@@ -33,12 +33,6 @@ wincng_aeskey_ctx_t wincng_aeskey_ctx_new(const unsigned char *shared_secret_key
 	ctx->shared_secret_key = shared_secret_key;
 	ctx->shared_secret_key_size = shared_secret_key_size;
 	
-	// make a copy of IV
-	ctx->pbIV = malloc(iv_size);
-	assert(ctx->pbIV);
-
-	memcpy(ctx->pbIV, iv, iv_size);
-	ctx->cbIV = iv_size;
 
 	
 	NTSTATUS status;
@@ -68,9 +62,9 @@ wincng_aeskey_ctx_t wincng_aeskey_ctx_new(const unsigned char *shared_secret_key
 	}
 
 
-	// Allocate the keyObject on the heap.
+	// Allocate the keyObject
 	// keyobject takes data when hKey is generated
-	ctx->pbKeyObject = (PBYTE)HeapAlloc(GetProcessHeap(), 0, ctx->cbKeyObject);
+	ctx->pbKeyObject = malloc(ctx->cbKeyObject);
 	if (NULL == ctx->pbKeyObject)
 	{
 		goto done_err;
@@ -97,16 +91,12 @@ wincng_aeskey_ctx_t wincng_aeskey_ctx_new(const unsigned char *shared_secret_key
 		goto done_err;
 	}
 
-	// Allocate a buffer for the IV. The buffer is consumed during the 
-// encrypt/decrypt process.
-	ctx->pbIV = (PBYTE)HeapAlloc(GetProcessHeap(), 0, ctx->cbIV);
-	if (NULL == ctx->pbIV)
-	{
-		printf("**** memory allocation failed\n");
-		goto done_err;
-	}
+	// make a copy of IV
+	ctx->pbIV = malloc(iv_size);
+	assert(ctx->pbIV);
 
-	memcpy(ctx->pbIV, iv, ctx->cbIV);
+	memcpy(ctx->pbIV, iv, iv_size);
+	ctx->cbIV = iv_size;
 
 
 	// CNG API needs us to choose a mode: CBC mode is recommeded
