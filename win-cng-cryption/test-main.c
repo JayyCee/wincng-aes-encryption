@@ -20,44 +20,45 @@ int main(int argc, const char *argv[])
 
 	printf("%s is running ...\n", argv[0]);
 
-	const char plaintext[] = "This is JC's plaintext data!";
-	const unsigned char *ciphertext_p = NULL;
-	size_t ciphertext_size = 0;
-
-	const unsigned char shared_aeskey_secret_array[] = {
+	const unsigned char shared_aes_secret_array[] = {
 		113,  77,   4, 200, 210, 172, 225, 192,
 		130,  46, 250,   0, 151, 255, 179,  88
 	};
 
-	unsigned char shared_aeskey_iv_arrary[] = {
+	unsigned char shared_aes_iv_arrary[] = {
 		163, 210, 138,  47,  42,  64, 194,  92,
 		48, 198,  97, 198, 198,   0, 100,  86
 	};
 
-	wincng_aeskey_ctx_t aeskey_encrypt_ctx = NULL;
+	wincng_aes_ctx_t aes_ctx = NULL;
 
-	int i;
 
-	for (i = 0; i < 16; i++) {
-		shared_aeskey_iv_arrary[i] = wincng_ran_byte();
-		printf("ran = % d\n", shared_aeskey_iv_arrary[i]);
-	}
-
-	aeskey_encrypt_ctx = wincng_aeskey_ctx_new(
-		&shared_aeskey_secret_array[0],
-		sizeof(shared_aeskey_secret_array),
-		&shared_aeskey_iv_arrary[0],
-		sizeof(shared_aeskey_iv_arrary)
+	// JC todo: remove IV here:
+	aes_ctx = wincng_aes_ctx_new(
+		&shared_aes_secret_array[0],
+		sizeof(shared_aes_secret_array)
 	);
-	assert(aeskey_encrypt_ctx);
 
-	//retv = wincng_aeskey_ctx_new(&aeskey_byte_array[0], sizeof(aeskey_byte_array), &aeskey_ctx);
+	assert(aes_ctx);
 
-	//retv = wincng_crypt_aes_encrypt(&aeskey_ctx, plaintext, sizeof(plaintext), &ciphertext_p, &ciphertext_size);
+	//JC todo: encryption with a new IV:
+	// 
+	unsigned char *iv_p = NULL;
+	size_t iv_size = 0;
+	const unsigned char plaintext[] = "JC message!";
+	const unsigned char *ciphertext_p = NULL;
+	size_t ciphertext_size = 0;
+
+	retv = wincng_aes_encrypt(
+		aes_ctx,
+		plaintext, sizeof(plaintext),
+		&ciphertext_p, &ciphertext_size,
+		&iv_p, &iv_size
+	);
 
 	assert(retv == 0);
 
-	wincng_aeskey_ctx_free(aeskey_encrypt_ctx);
+	wincng_aes_ctx_free(aes_ctx);
 
 	return 0;
 }

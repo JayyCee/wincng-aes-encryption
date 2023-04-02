@@ -8,7 +8,7 @@
 
 #include "wincng_crypt.h"
 
-#include "wincng_aeskey.h"
+#include "wincng_aes.h"
 
 #define MY_LOG(...) do {int line = __LINE__;\
 	printf("%s:%d: ", __FILE__, line);\
@@ -21,9 +21,9 @@
 static const char *wincng_get_ntstat_s_by_v(NTSTATUS v);
 
 
-wincng_aeskey_ctx_t wincng_aeskey_ctx_new(const unsigned char *shared_secret_key, size_t shared_secret_key_size, const unsigned char *iv, size_t iv_size)
+wincng_aes_ctx_t wincng_aes_ctx_new(const unsigned char *shared_secret_key, size_t shared_secret_key_size)
 {
-	wincng_aeskey_ctx_t ctx = NULL;
+	wincng_aes_ctx_t ctx = NULL;
 	ctx = calloc(1, sizeof(*ctx));
 
 	if (!ctx)
@@ -71,32 +71,6 @@ wincng_aeskey_ctx_t wincng_aeskey_ctx_new(const unsigned char *shared_secret_key
 	}
 
 
-	// Calculate the block length for the IV.
-	if (!NT_SUCCESS(status = BCryptGetProperty(
-		ctx->hAesAlg,
-		BCRYPT_BLOCK_LENGTH,   //JC: this does not seem to have anything related to the IV?
-		(PBYTE)&ctx->cbIV,
-		sizeof(DWORD),
-		&cbResult,
-		0)))
-	{
-		printf("**** Error 0x%x returned by BCryptGetProperty\n", status);
-		goto done_err;
-	}
-
-	// Determine whether the cbIV is not longer than the IV length.
-	if (ctx->cbIV > iv_size)
-	{
-		printf("**** block length is longer than the provided IV length\n");
-		goto done_err;
-	}
-
-	// make a copy of IV
-	ctx->pbIV = malloc(iv_size);
-	assert(ctx->pbIV);
-
-	memcpy(ctx->pbIV, iv, iv_size);
-	ctx->cbIV = iv_size;
 
 
 	// CNG API needs us to choose a mode: CBC mode is recommeded
@@ -130,7 +104,7 @@ wincng_aeskey_ctx_t wincng_aeskey_ctx_new(const unsigned char *shared_secret_key
 
 done_err:
 	if (ctx) {
-		wincng_aeskey_ctx_free(ctx);
+		wincng_aes_ctx_free(ctx);
 		ctx = NULL;
 	}
 
@@ -167,15 +141,11 @@ int wincng_ran_byte()
 }
 
 
-void wincng_aeskey_ctx_free(wincng_aeskey_ctx_t ctx)
+void wincng_aes_ctx_free(wincng_aes_ctx_t ctx)
 {
 	if (ctx == NULL)
 		return;
 
-	if (ctx->pbIV) {
-		free(ctx->pbIV);
-		ctx->pbIV = NULL;
-	}
 
 	if (ctx->pbKeyObject) {
 		free(ctx->pbKeyObject);
@@ -216,4 +186,138 @@ static const char *wincng_get_ntstat_s_by_v(NTSTATUS v)
 	}
 
 	return unknown;
+}
+
+
+static int wincng_aes_iv_gen(unsigned char **iv_pp, size_t *iv_size_p)
+{
+	int retv_exit = 0;
+	int i;
+
+#define IV_SIZE 16
+
+	unsigned char *iv_p = malloc(IV_SIZE);
+	assert(iv_p);
+
+	for (i = 0; i < IV_SIZE; i++) {
+		iv_p[i] = (unsigned char)wincng_ran_byte();
+	}
+
+	*iv_pp = iv_p;
+	*iv_size_p = IV_SIZE;
+
+	return retv_exit;
+}
+
+
+
+int wincng_aes_encrypt(
+	wincng_aes_ctx_t ctx,
+	const unsigned char *plaintext_p, size_t plaintext_size,
+	const unsigned char **ciphertext_pp, size_t *ciphertext_size_p,
+	const unsigned char **iv_pp, size_t *iv_size_p
+)
+
+{
+	int retv_exit = 0;
+	int retv;
+
+	NTSTATUS status;
+	ULONG cbResult = 0;
+	PUCHAR pbIV_tmp = NULL;
+	ULONG cbIV_tmp;
+
+	unsigned char *iv_p;
+	size_t iv_size;
+
+	retv = wincng_aes_iv_gen(&iv_p, &iv_size);
+	assert(retv);
+
+	pbIV_tmp = malloc(iv_size);
+	assert(pbIV_tmp);
+
+
+	// Calculate the block length for the IV.
+	if (!NT_SUCCESS(status = BCryptGetProperty(
+		ctx->hAesAlg,
+		BCRYPT_BLOCK_LENGTH,   //JC: this does not seem to have anything related to the IV?
+		(PBYTE)&cbIV_tmp,
+		sizeof(cbIV_tmp),
+		&cbResult,
+		0)))
+	{
+		printf("**** Error 0x%x returned by BCryptGetProperty\n", status);
+		goto done_err;
+	}
+
+	// Determine whether the cbIV is not longer than the IV length.
+	if (cbIV_tmp > iv_size)
+	{
+		printf("**** block length is longer than the provided IV length\n");
+		goto done_err;
+	}
+
+
+	//
+	// find out the output ciphertext buffer size.
+	//
+	ULONG cbCiphertext;
+
+	if (!NT_SUCCESS(status = BCryptEncrypt(
+		ctx->hKey,
+		(PUCHAR)plaintext_p,
+		(ULONG)plaintext_size,
+		NULL,
+		(PUCHAR)iv_p,
+		(ULONG)iv_size,
+		NULL,
+		0,
+		&cbCiphertext,
+		BCRYPT_BLOCK_PADDING)))
+	{
+		printf("**** Error 0x%x returned by BCryptEncrypt\n", status);
+		goto done_err;
+	}
+
+	unsigned char *pbCiphertext = malloc(cbCiphertext);
+	if (NULL == pbCiphertext)
+	{
+		printf("**** memory allocation failed\n");
+		goto done_err;
+	}
+
+	// Use the key to encrypt the plaintext buffer.
+	// For block sized messages, block padding will add an extra block.
+	if (!NT_SUCCESS(status = BCryptEncrypt(
+		ctx->hKey,
+		(PUCHAR)plaintext_p,
+		(ULONG)plaintext_size,
+		NULL,        //JC: the padding is not needed here
+		iv_p,
+		(ULONG)iv_size,
+		pbCiphertext,
+		cbCiphertext,
+		&cbResult,
+		BCRYPT_BLOCK_PADDING)))
+	{
+		printf("**** Error 0x%x returned by BCryptEncrypt\n", status);
+		goto done_err;
+	}
+
+	
+	*iv_pp = iv_p;
+	*iv_size_p = iv_size;
+	*ciphertext_pp = pbCiphertext;
+	*ciphertext_size_p = cbCiphertext;
+
+	goto done;
+
+done_err:
+
+done:
+	if (pbIV_tmp)
+		free(pbIV_tmp);
+
+	return retv_exit;
+
 }
