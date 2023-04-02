@@ -172,6 +172,7 @@ struct ntstat_v_s {
 
 static struct  ntstat_v_s sg_ntstat_v_s[] = {
 	STATUS_BUFFER_TOO_SMALL, "STATUS_BUFFER_TOO_SMALL",
+	STATUS_DATA_ERROR, "STATUS_DATA_ERROR",
 };
 
 static const char *wincng_get_ntstat_s_by_v(NTSTATUS v)
@@ -231,7 +232,10 @@ int wincng_aes_encrypt(
 	size_t iv_size;
 
 	retv = wincng_aes_iv_gen(&iv_p, &iv_size);
-	assert(retv);
+	if (retv != 0) {
+		MY_LOG("wincng_aes_iv_gen() failed.");
+	}
+	assert(retv == 0);
 
 	pbIV_tmp = malloc(iv_size);
 	assert(pbIV_tmp);
@@ -297,7 +301,7 @@ int wincng_aes_encrypt(
 		(ULONG)iv_size,
 		pbCiphertext,
 		cbCiphertext,
-		&cbResult,
+		&cbCiphertext,
 		BCRYPT_BLOCK_PADDING)))
 	{
 		printf("**** Error 0x%x returned by BCryptEncrypt\n", status);
@@ -313,6 +317,7 @@ int wincng_aes_encrypt(
 	goto done;
 
 done_err:
+	retv_exit = -1;
 
 done:
 	if (pbIV_tmp)
@@ -321,3 +326,89 @@ done:
 	return retv_exit;
 
 }
+
+
+int wincng_aes_decrypt(
+	wincng_aes_ctx_t ctx,
+	unsigned char *iv_p, size_t iv_size,
+	unsigned char *ciphertext_p, size_t ciphertext_size,
+	unsigned char **decrypted_data_pp, size_t *decrypted_data_size_p
+)
+{
+	int retv_exit = 0;
+
+	NTSTATUS status;
+
+
+
+	// Reinitialize a temp IV because encryption would have modified the original.
+
+	DWORD cbIV_tmp = (DWORD)iv_size;
+	PUCHAR pbIV_tmp = malloc(cbIV_tmp);
+	assert(pbIV_tmp);
+
+	memcpy(pbIV_tmp, iv_p, cbIV_tmp);
+
+
+	//
+	// Get the plaintext output buffer size.
+	//
+
+	ULONG cbPlaintext = 0;
+	PUCHAR pbPlaintext = NULL;
+
+	if (!NT_SUCCESS(status = BCryptDecrypt(
+		ctx->hKey,
+		(PUCHAR)ciphertext_p,
+		(ULONG)ciphertext_size,
+		NULL,
+		pbIV_tmp,
+		cbIV_tmp,
+		NULL,
+		0,
+		&cbPlaintext,
+		BCRYPT_BLOCK_PADDING)))
+	{
+		printf("**** Error 0x%x returned by BCryptDecrypt\n", status);
+		goto done_err;
+	}
+
+	pbPlaintext = malloc(cbPlaintext);
+	assert(pbPlaintext);
+
+
+	// now do real descryption
+
+	if (!NT_SUCCESS(status = BCryptDecrypt(
+		ctx->hKey,
+		(PUCHAR)ciphertext_p,
+		(ULONG)ciphertext_size,
+		NULL,
+		pbIV_tmp,
+		cbIV_tmp,
+		pbPlaintext,
+		cbPlaintext,
+		&cbPlaintext,
+		BCRYPT_BLOCK_PADDING)))
+	{
+		MY_LOG("** Error: BCryptDecrypt(): 0x%08X: %s\n", status, wincng_get_ntstat_s_by_v(status));
+		goto done_err;
+	}
+
+	// all is good now
+	*decrypted_data_pp = pbPlaintext;
+	*decrypted_data_size_p = cbPlaintext;
+	goto done;
+
+done_err:
+	retv_exit = -1;
+
+done:
+
+	if (pbIV_tmp)
+		free(pbIV_tmp);
+
+	return retv_exit;
+
+}
+

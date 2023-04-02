@@ -25,28 +25,20 @@ int main(int argc, const char *argv[])
 		130,  46, 250,   0, 151, 255, 179,  88
 	};
 
-	unsigned char shared_aes_iv_arrary[] = {
-		163, 210, 138,  47,  42,  64, 194,  92,
-		48, 198,  97, 198, 198,   0, 100,  86
-	};
 
 	wincng_aes_ctx_t aes_ctx = NULL;
 
-
-	// JC todo: remove IV here:
 	aes_ctx = wincng_aes_ctx_new(
-		&shared_aes_secret_array[0],
+		shared_aes_secret_array,
 		sizeof(shared_aes_secret_array)
 	);
 
 	assert(aes_ctx);
 
-	//JC todo: encryption with a new IV:
-	// 
 	unsigned char *iv_p = NULL;
 	size_t iv_size = 0;
-	const unsigned char plaintext[] = "JC message!";
-	const unsigned char *ciphertext_p = NULL;
+	const unsigned char plaintext[] = "JC message! 1234567890abcdefg";
+	unsigned char *ciphertext_p = NULL;
 	size_t ciphertext_size = 0;
 
 	retv = wincng_aes_encrypt(
@@ -59,6 +51,33 @@ int main(int argc, const char *argv[])
 	assert(retv == 0);
 
 	wincng_aes_ctx_free(aes_ctx);
+	aes_ctx = NULL;
+
+	
+	// ============== DO Decryption ===============
+
+	aes_ctx = wincng_aes_ctx_new(
+		shared_aes_secret_array,
+		sizeof(shared_aes_secret_array)
+	);
+
+	assert(aes_ctx);
+
+	unsigned char *decrypted_data_p = NULL;
+	size_t decrypted_data_size = 0;
+
+	retv = wincng_aes_decrypt(
+		aes_ctx,
+		iv_p, iv_size,
+		ciphertext_p, ciphertext_size,
+		&decrypted_data_p, &decrypted_data_size
+	);
+
+	assert(retv == 0);
+
+	wincng_aes_ctx_free(aes_ctx);
+	aes_ctx = NULL;
+
 
 	return 0;
 }
