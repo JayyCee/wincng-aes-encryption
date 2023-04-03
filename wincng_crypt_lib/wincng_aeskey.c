@@ -91,7 +91,7 @@ done:
 static int wincng_random_bytes(unsigned char *buf, size_t buf_size)
 {
 	int retv_exit = 0;
-	BCRYPT_ALG_HANDLE hAlgRan;
+	BCRYPT_ALG_HANDLE hAlgRan = NULL;
 
 
 	NTSTATUS ns = BCryptOpenAlgorithmProvider(
@@ -114,11 +114,14 @@ static int wincng_random_bytes(unsigned char *buf, size_t buf_size)
 	);
 
 	if (ns != STATUS_SUCCESS) {
+		retv_exit = -1;
 		goto done;
 	}
 
 
 done:
+	if (hAlgRan)
+		BCryptCloseAlgorithmProvider(hAlgRan, 0);
 
 	return retv_exit;
 }
