@@ -75,6 +75,7 @@ int main(int argc, const char *argv[])
 
 	assert(retv == 0);
 
+	// everything is done, do cleanups
 	wincng_aes_ctx_free(aes_ctx);
 	aes_ctx = NULL;
 
