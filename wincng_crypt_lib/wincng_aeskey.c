@@ -175,14 +175,29 @@ static int wincng_aes_iv_gen(unsigned char **iv_pp, size_t *iv_size_p)
 #define IV_SIZE 16
 
 	unsigned char *iv_p = malloc(IV_SIZE);
-	assert(iv_p);
+	if (iv_p == NULL) {
+		retv_exit = -1;
+		goto done_err;
+	}
 
 	retv = wincng_random_bytes(iv_p, IV_SIZE);
-	assert(retv == 0);
+	if (retv != 0) {
+		retv_exit = -1;
+		goto done;
+	}
 
 
 	*iv_pp = iv_p;
 	*iv_size_p = IV_SIZE;
+	goto done;
+
+done_err:
+	if (iv_p)
+		free(iv_p);
+	*iv_pp = NULL;
+	*iv_size_p = 0;
+
+done:
 
 	return retv_exit;
 }
