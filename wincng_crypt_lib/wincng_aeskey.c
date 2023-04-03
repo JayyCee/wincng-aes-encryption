@@ -20,6 +20,12 @@
 
 static const char *wincng_get_ntstat_s_by_v(NTSTATUS v);
 
+static const BYTE rgbIV[] =
+{
+	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+	0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F
+};
+
 
 wincng_aes_ctx_t wincng_aes_ctx_new(const unsigned char *shared_secret_key, size_t shared_secret_key_size)
 {
@@ -261,6 +267,8 @@ int wincng_aes_encrypt(
 		goto done_err;
 	}
 
+	memcpy(pbIV_tmp, iv_p, iv_size);
+
 
 	//
 	// find out the output ciphertext buffer size.
@@ -272,8 +280,8 @@ int wincng_aes_encrypt(
 		(PUCHAR)plaintext_p,
 		(ULONG)plaintext_size,
 		NULL,
-		(PUCHAR)iv_p,
-		(ULONG)iv_size,
+		pbIV_tmp,
+		cbIV_tmp,
 		NULL,
 		0,
 		&cbCiphertext,
@@ -297,8 +305,8 @@ int wincng_aes_encrypt(
 		(PUCHAR)plaintext_p,
 		(ULONG)plaintext_size,
 		NULL,        //JC: the padding is not needed here
-		iv_p,
-		(ULONG)iv_size,
+		pbIV_tmp,
+		cbIV_tmp,
 		pbCiphertext,
 		cbCiphertext,
 		&cbCiphertext,
