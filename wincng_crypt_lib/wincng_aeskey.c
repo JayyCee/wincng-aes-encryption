@@ -198,7 +198,6 @@ done_err:
 	*iv_size_p = 0;
 
 done:
-
 	return retv_exit;
 }
 
