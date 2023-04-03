@@ -6,11 +6,6 @@ typedef struct wincng_aes_ctx {
 	const unsigned char *shared_secret_key;
 	size_t shared_secret_key_size;
 	BCRYPT_ALG_HANDLE       hAesAlg;
-
-
-	PUCHAR pbKeyObject;
-	ULONG  cbKeyObject;
-
 	BCRYPT_KEY_HANDLE       hKey;
 
 } *wincng_aes_ctx_t;

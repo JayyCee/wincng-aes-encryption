@@ -46,32 +46,6 @@ wincng_aes_ctx_t wincng_aes_ctx_new(const unsigned char *shared_secret_key, size
 		goto done_err;
 	}
 
-	// Calculate the size of the buffer to hold the KeyObject.
-	ULONG cbResult = 0;
-
-	if (!NT_SUCCESS(status = BCryptGetProperty(
-		ctx->hAesAlg,
-		BCRYPT_OBJECT_LENGTH,
-		(PUCHAR)&(ctx->cbKeyObject),
-		sizeof(ctx->cbKeyObject),
-		&cbResult,
-		0)))
-	{
-		MY_LOG("** Error: BCryptGetProperty(): 0x%08X: %s\n", status, wincng_get_ntstat_s_by_v(status));
-		goto done_err;
-	}
-
-
-	// Allocate the keyObject
-	// keyobject takes data when hKey is generated
-	ctx->pbKeyObject = malloc(ctx->cbKeyObject);
-	if (NULL == ctx->pbKeyObject)
-	{
-		goto done_err;
-	}
-
-
-
 
 	// CNG API needs us to choose a mode: CBC mode is recommeded
 	if (!NT_SUCCESS(status = BCryptSetProperty(
@@ -89,8 +63,8 @@ wincng_aes_ctx_t wincng_aes_ctx_new(const unsigned char *shared_secret_key, size
 	if (!NT_SUCCESS(status = BCryptGenerateSymmetricKey(
 		ctx->hAesAlg,
 		&ctx->hKey,
-		ctx->pbKeyObject,
-		ctx->cbKeyObject,
+		NULL, //ctx->pbKeyObject,
+		0, //ctx->cbKeyObject,
 		(PBYTE)shared_secret_key,
 		(ULONG)shared_secret_key_size,
 		0)))
@@ -145,12 +119,6 @@ void wincng_aes_ctx_free(wincng_aes_ctx_t ctx)
 {
 	if (ctx == NULL)
 		return;
-
-
-	if (ctx->pbKeyObject) {
-		free(ctx->pbKeyObject);
-		ctx->pbKeyObject = NULL;
-	}
 
 	if (ctx->hKey) {
 		BCryptDestroyKey(ctx->hKey);
