@@ -88,9 +88,11 @@ done:
 }
 
 
-int wincng_ran_byte()
+static int wincng_random_bytes(unsigned char *buf, size_t buf_size)
 {
+	int retv_exit = 0;
 	BCRYPT_ALG_HANDLE hAlgRan;
+
 
 	NTSTATUS ns = BCryptOpenAlgorithmProvider(
 		&hAlgRan,
@@ -99,19 +101,26 @@ int wincng_ran_byte()
 		0
 	);
 
-	assert(ns == STATUS_SUCCESS);
+	if (ns != STATUS_SUCCESS) {
+		retv_exit = -1;
+		goto done;
+	}
 
-	unsigned char buf[1];
 	ns = BCryptGenRandom(
 		hAlgRan,
-		&buf[0],
-		sizeof(buf),
+		buf,
+		(ULONG)buf_size,
 		0
 	);
 
-	assert(ns == STATUS_SUCCESS);
+	if (ns != STATUS_SUCCESS) {
+		goto done;
+	}
 
-	return buf[0];
+
+done:
+
+	return retv_exit;
 }
 
 
@@ -161,16 +170,16 @@ static const char *wincng_get_ntstat_s_by_v(NTSTATUS v)
 static int wincng_aes_iv_gen(unsigned char **iv_pp, size_t *iv_size_p)
 {
 	int retv_exit = 0;
-	int i;
+	int retv;
 
 #define IV_SIZE 16
 
 	unsigned char *iv_p = malloc(IV_SIZE);
 	assert(iv_p);
 
-	for (i = 0; i < IV_SIZE; i++) {
-		iv_p[i] = (unsigned char)wincng_ran_byte();
-	}
+	retv = wincng_random_bytes(iv_p, IV_SIZE);
+	assert(retv == 0);
+
 
 	*iv_pp = iv_p;
 	*iv_size_p = IV_SIZE;

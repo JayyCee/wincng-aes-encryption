@@ -53,7 +53,7 @@ int main(int argc, const char *argv[])
 	wincng_aes_ctx_free(aes_ctx);
 	aes_ctx = NULL;
 
-	
+
 	// ============== DO Decryption ===============
 
 	aes_ctx = wincng_aes_ctx_new(
