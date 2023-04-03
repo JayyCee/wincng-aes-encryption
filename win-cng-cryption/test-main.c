@@ -78,6 +78,20 @@ int main(int argc, const char *argv[])
 	wincng_aes_ctx_free(aes_ctx);
 	aes_ctx = NULL;
 
+	if (decrypted_data_p) {
+		free(decrypted_data_p);
+		decrypted_data_p = NULL;
+	}
+	
+	if (ciphertext_p) {
+		free(ciphertext_p);
+		ciphertext_p = NULL;
+	}
+
+	if (iv_p) {
+		free(iv_p);
+		iv_p = NULL;
+	}
 
 	return 0;
 }
