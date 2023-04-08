@@ -140,7 +140,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="base64_proc.h" />
-    <ClInclude Include="framework.h" />
     <ClInclude Include="wincng_aes.h" />
     <ClInclude Include="wincng_crypt.h" />
   </ItemGroup>
