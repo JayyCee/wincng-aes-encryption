@@ -11,3 +11,5 @@ typedef struct wincng_aes_ctx {
 } *wincng_aes_ctx_t;
 
 #include "wincng_aes.h"
+
+#include "base64_proc.h"

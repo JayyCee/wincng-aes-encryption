@@ -24,9 +24,15 @@
     <ClInclude Include="wincng_aes.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="base64_proc.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="wincng_aeskey.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="base64_proc.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

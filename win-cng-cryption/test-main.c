@@ -1,6 +1,9 @@
 // win-cng-cryption.cpp : This file contains the 'main' function. Program execution begins and ends there.
 //
 
+#pragma warning(disable : 4996)
+
+
 #include <Windows.h>
 #include <stdio.h>
 #include <assert.h>
@@ -9,6 +12,7 @@
 
 #pragma comment (lib, "Bcrypt.lib")
 #pragma comment (lib, "wincng_crypt_lib.lib")
+#pragma comment (lib, "Crypt32.lib")  // for base64 function
 
 
 
@@ -53,6 +57,45 @@ int main(int argc, const char *argv[])
 	wincng_aes_ctx_free(aes_ctx);
 	aes_ctx = NULL;
 
+	// prefix VI to encrypted data
+	// 
+	unsigned char *total_data_buf = NULL;
+	size_t total_data_buf_size = iv_size + ciphertext_size;
+
+	total_data_buf = (unsigned char *)malloc(total_data_buf_size);
+
+	assert(total_data_buf);
+
+	memcpy(total_data_buf, iv_p, iv_size);
+	memcpy(total_data_buf + iv_size, ciphertext_p, ciphertext_size);
+
+// ----- Write to file ------
+// 
+	const char *encrypt_filename = "my_encrypt.out";
+
+	FILE *fp_out = fopen(encrypt_filename, "w");
+
+	if (fp_out == NULL) {
+		printf("fopen(%s) failed: %s\n", encrypt_filename, strerror(errno));
+		retv_exit = 1;
+		goto done;
+	}
+
+	// base64
+	const char *base64_buf_p;
+	size_t base64_buf_size;
+
+	retv = base64_encode(total_data_buf, total_data_buf_size, &base64_buf_p, &base64_buf_size);
+
+	size_t nw = fwrite(base64_buf_p, 1, base64_buf_size, fp_out);
+
+	assert(nw == base64_buf_size);
+
+	if (fp_out) {
+		fclose(fp_out);
+		fp_out = NULL;
+	}
+
 
 	// ============== DO Decryption ===============
 
@@ -93,6 +136,8 @@ int main(int argc, const char *argv[])
 		free(iv_p);
 		iv_p = NULL;
 	}
+
+done:
 
 	return 0;
 }

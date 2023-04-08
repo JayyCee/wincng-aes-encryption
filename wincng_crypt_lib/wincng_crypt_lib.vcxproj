@@ -139,11 +139,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="base64_proc.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="wincng_aes.h" />
     <ClInclude Include="wincng_crypt.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="base64_proc.c" />
     <ClCompile Include="wincng_aeskey.c" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
