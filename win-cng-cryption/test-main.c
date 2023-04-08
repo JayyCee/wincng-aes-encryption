@@ -7,6 +7,7 @@
 #include <Windows.h>
 #include <stdio.h>
 #include <assert.h>
+#include <sys/stat.h>
 
 #include "wincng_crypt.h"
 
@@ -81,11 +82,12 @@ int main(int argc, const char *argv[])
 		goto done;
 	}
 
-	// base64
+	// base64_encode
 	const char *base64_buf_p;
 	size_t base64_buf_size;
 
 	retv = base64_encode(total_data_buf, total_data_buf_size, &base64_buf_p, &base64_buf_size);
+	assert(retv == 0);
 
 	size_t nw = fwrite(base64_buf_p, 1, base64_buf_size, fp_out);
 
@@ -96,6 +98,17 @@ int main(int argc, const char *argv[])
 		fp_out = NULL;
 	}
 
+	// base64_decode
+	// 
+	
+	unsigned char *base64_decode_buf = NULL;
+	size_t base64_decode_buf_size;
+
+	retv = base64_decode(base64_buf_p, base64_buf_size, &base64_decode_buf, &base64_decode_buf_size);
+	assert(retv == 0);
+
+	retv = memcmp(base64_decode_buf, total_data_buf, total_data_buf_size);
+	assert(retv == 0);
 
 	// ============== DO Decryption ===============
 
@@ -118,7 +131,73 @@ int main(int argc, const char *argv[])
 
 	assert(retv == 0);
 
-	// everything is done, do cleanups
+	// ========== Read file =======
+	// 
+	
+	FILE *fp_in;
+	fp_in = fopen(encrypt_filename, "rb");
+
+	if (fp_in == NULL) {
+		printf("fopen(%s) failed: %s\n", encrypt_filename, strerror(errno));
+		retv_exit = 1;
+		goto done;
+	}
+
+	struct stat my_stat;
+
+	retv = stat(encrypt_filename, &my_stat);
+	size_t read_buf_size = my_stat.st_size;
+	unsigned char *read_buf = malloc(read_buf_size);
+	assert(read_buf);
+
+	size_t nr = 0;
+	nr = fread(read_buf, 1, read_buf_size, fp_in);
+	assert(nr == read_buf_size);
+
+
+	if (fp_in) {
+		fclose(fp_in);
+		fp_in = NULL;
+	}
+
+	// base64_decode
+	// 
+
+	if (base64_decode_buf)
+		free(base64_decode_buf);
+
+	base64_decode_buf = NULL;
+	base64_decode_buf_size;
+
+	retv = base64_decode(base64_buf_p, base64_buf_size, &base64_decode_buf, &base64_decode_buf_size);
+	assert(retv == 0);
+
+	retv = memcmp(base64_decode_buf, total_data_buf, total_data_buf_size);
+	assert(retv == 0);
+
+	unsigned char *iv_buf = NULL;
+	size_t iv_buf_size = iv_size;
+
+	iv_buf = malloc(iv_buf_size);
+	assert(iv_buf);
+
+	memcpy(iv_buf, base64_decode_buf, iv_buf_size);
+
+	retv = memcmp(iv_buf, iv_p, iv_buf_size);
+	assert(retv == 0);
+
+	unsigned char *encrypt_buf = NULL;
+	size_t encrypt_buf_size = base64_decode_buf_size - iv_buf_size;
+	encrypt_buf = (unsigned char *)malloc(encrypt_buf_size);
+	assert(encrypt_buf);
+
+	memcpy(encrypt_buf, base64_decode_buf + iv_buf_size, base64_decode_buf_size - iv_buf_size);
+
+	retv = memcmp(encrypt_buf, ciphertext_p, encrypt_buf_size);
+	assert(retv == 0);
+
+
+	// ======= everything is done, do cleanups
 	wincng_aes_ctx_free(aes_ctx);
 	aes_ctx = NULL;
 
