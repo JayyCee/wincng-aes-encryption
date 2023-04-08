@@ -196,10 +196,42 @@ int main(int argc, const char *argv[])
 	retv = memcmp(encrypt_buf, ciphertext_p, encrypt_buf_size);
 	assert(retv == 0);
 
+	// ==== Decrypt again
+	// 
+	if (aes_ctx) {
+		wincng_aes_ctx_free(aes_ctx);
+		aes_ctx = NULL;
+	}
+
+	aes_ctx = wincng_aes_ctx_new(
+		shared_aes_secret_array,
+		sizeof(shared_aes_secret_array)
+	);
+
+	assert(aes_ctx);
+
+	if (decrypted_data_p) {
+		free(decrypted_data_p);
+		decrypted_data_p = NULL;
+	}
+
+	decrypted_data_size = 0;
+
+	retv = wincng_aes_decrypt(
+		aes_ctx,
+		iv_buf, iv_buf_size,
+		encrypt_buf, encrypt_buf_size,
+		&decrypted_data_p, &decrypted_data_size
+	);
+
+	assert(retv == 0);
+
 
 	// ======= everything is done, do cleanups
-	wincng_aes_ctx_free(aes_ctx);
-	aes_ctx = NULL;
+	if (aes_ctx) {
+		wincng_aes_ctx_free(aes_ctx);
+		aes_ctx = NULL;
+	}
 
 	if (decrypted_data_p) {
 		free(decrypted_data_p);
